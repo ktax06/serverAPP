@@ -1,0 +1,256 @@
+---
+import "../styles/global.css";
+---
+
+<html>
+  <head>
+    <title>Asistencia de Hoy</title>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  </head>
+  <body class="bg-gray-100 min-h-screen">
+    <div class="container mx-auto py-8 px-4">
+      <h1 class="text-2xl font-bold text-center mb-8 text-blue-700">Registro de Asistencia del Día</h1>
+      
+      <div class="bg-white rounded-lg shadow-md overflow-hidden max-w-4xl mx-auto">
+        <div class="p-4 bg-blue-50 border-b border-blue-100 flex justify-between items-center">
+          <div>
+            <h2 class="text-lg font-semibold text-blue-800">Asistencia de Hoy</h2>
+            <p id="fecha-actual" class="text-sm text-blue-600"></p>
+          </div>
+          <button id="refresh-btn" class="bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded-md text-sm transition-colors">
+            Actualizar
+          </button>
+        </div>
+        
+        <div class="p-4" id="loading-container">
+          <div class="flex justify-center">
+            <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-500"></div>
+          </div>
+          <p class="text-center text-gray-500 mt-2">Cargando datos de asistencia...</p>
+        </div>
+        
+        <div id="stats-container" class="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 hidden">
+          <div class="bg-blue-50 p-3 rounded-lg text-center">
+            <p class="text-blue-800 text-sm font-medium">Total Asistencias</p>
+            <p id="total-count" class="text-2xl font-bold text-blue-900">0</p>
+          </div>
+          
+          <div class="bg-green-50 p-3 rounded-lg text-center">
+            <p class="text-green-800 text-sm font-medium">Primera Entrada</p>
+            <p id="primera-hora" class="text-lg font-bold text-green-900">--:--</p>
+          </div>
+          
+          <div class="bg-purple-50 p-3 rounded-lg text-center">
+            <p class="text-purple-800 text-sm font-medium">Última Entrada</p>
+            <p id="ultima-hora" class="text-lg font-bold text-purple-900">--:--</p>
+          </div>
+        </div>
+        
+        <div id="error-container" class="hidden p-4 bg-red-50 text-red-700 text-center"></div>
+        
+        <div class="overflow-x-auto">
+          <table class="w-full" id="asistencia-table">
+            <thead>
+              <tr class="bg-gray-50 text-gray-700 text-left">
+                <th class="py-3 px-4 font-medium">ID</th>
+                <th class="py-3 px-4 font-medium">Usuario ID</th>
+                <th class="py-3 px-4 font-medium">Nombre</th>
+                <th class="py-3 px-4 font-medium">Hora</th>
+              </tr>
+            </thead>
+            <tbody id="asistencia-table-body">
+              <!-- Los datos de asistencia se cargarán aquí -->
+            </tbody>
+          </table>
+        </div>
+        
+        <div id="empty-message" class="hidden p-6 text-center text-gray-500">
+          No hay registros de asistencia para el día de hoy.
+        </div>
+      </div>
+      
+      <div class="mt-6 text-center">
+        <a href="/" class="inline-block bg-gray-500 hover:bg-gray-600 text-white py-2 px-6 rounded-md transition-colors mr-4">
+          Volver al Inicio
+        </a>
+        <a href="/registro-asistencia" class="inline-block bg-green-500 hover:bg-green-600 text-white py-2 px-6 rounded-md transition-colors mr-4">
+          Registrar Nueva Asistencia
+        </a>
+        <a href="/grafico" class="inline-block bg-blue-500 hover:bg-blue-600 text-white py-2 px-6 rounded-md transition-colors">
+          Ver Gráfico
+        </a>
+      </div>
+    </div>
+    
+    <script>
+      // Elementos del DOM
+      const loadingContainer = document.getElementById('loading-container');
+      const errorContainer = document.getElementById('error-container');
+      const asistenciaTableBody = document.getElementById('asistencia-table-body');
+      const asistenciaTable = document.getElementById('asistencia-table');
+      const emptyMessage = document.getElementById('empty-message');
+      const refreshButton = document.getElementById('refresh-btn');
+      const fechaActual = document.getElementById('fecha-actual');
+      const totalCount = document.getElementById('total-count');
+      const primeraHora = document.getElementById('primera-hora');
+      const ultimaHora = document.getElementById('ultima-hora');
+      const statsContainer = document.getElementById('stats-container');
+      
+      // Cache para los nombres de usuario
+      const usuariosCache = {};
+      
+      // Formatear fecha actual para mostrar
+      const hoy = new Date();
+      const opciones = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+      fechaActual.textContent = hoy.toLocaleDateString('es-ES', opciones);
+      
+      // Función para cargar los datos de asistencia
+      async function cargarAsistencias() {
+        showLoading(true);
+        hideError();
+        
+        try {
+          const response = await fetch('/api/taller/hoy');
+          
+          if (!response.ok) {
+            throw new Error(`Error HTTP: ${response.status}`);
+          }
+          
+          const data = await response.json();
+          await obtenerNombresUsuarios(data.datos);
+          mostrarAsistencias(data.datos);
+          actualizarEstadisticas(data.datos);
+          console.log('Asistencias cargadas:', data.datos);
+        } catch (error) {
+          console.error('Error al cargar asistencias:', error);
+          showError(`Error al cargar los datos de asistencia: ${error.message}`);
+        } finally {
+          showLoading(false);
+        }
+      }
+      
+      // Obtener nombres de usuarios para cada registro
+      async function obtenerNombresUsuarios(registros) {
+        // Crear un conjunto de IDs únicos para consultar
+        const usuariosIds = new Set(registros.map(registro => registro.usuario_id));
+        const idsParaConsultar = [...usuariosIds].filter(id => !usuariosCache[id]);
+        
+        if (idsParaConsultar.length === 0) return;
+        
+        try {
+          // Obtener todos los usuarios de una vez
+          const response = await fetch('/api/usuarios/lista');
+          if (!response.ok) throw new Error('Error al obtener lista de usuarios');
+          
+          const data = await response.json();
+          
+          // Actualizar el cache con los nombres de usuarios
+          if (data.usuarios && Array.isArray(data.usuarios)) {
+            data.usuarios.forEach(usuario => {
+              usuariosCache[usuario.id] = usuario.nombre;
+            });
+          }
+        } catch (error) {
+          console.error('Error al obtener nombres de usuarios:', error);
+        }
+      }
+      
+      // Función para mostrar las asistencias en la tabla
+      function mostrarAsistencias(registros) {
+        if (!Array.isArray(registros) || registros.length === 0) {
+          asistenciaTable.classList.add('hidden');
+          statsContainer.classList.add('hidden');
+          emptyMessage.classList.remove('hidden');
+          return;
+        }
+        
+        asistenciaTable.classList.remove('hidden');
+        statsContainer.classList.remove('hidden');
+        emptyMessage.classList.add('hidden');
+        
+        // Limpiar la tabla
+        asistenciaTableBody.innerHTML = '';
+        
+        // Ordenar registros por hora (más reciente primero)
+        registros.sort((a, b) => new Date(`2000-01-01T${b.hora}`) - new Date(`2000-01-01T${a.hora}`));
+        
+        // Agregar cada registro a la tabla
+        registros.forEach(registro => {
+          const row = document.createElement('tr');
+          row.className = 'border-t border-gray-100 hover:bg-gray-50';
+          
+          // Formatear hora para mostrar
+          const horaFormateada = new Date(`2000-01-01T${registro.hora}`).toLocaleTimeString('es-ES', {
+            hour: '2-digit',
+            minute: '2-digit'
+          });
+          
+          row.innerHTML = `
+            <td class="py-3 px-4">${registro.id}</td>
+            <td class="py-3 px-4">${registro.usuario_id}</td>
+            <td class="py-3 px-4">${usuariosCache[registro.usuario_id] || 'Usuario desconocido'}</td>
+            <td class="py-3 px-4">${horaFormateada}</td>
+          `;
+          
+          asistenciaTableBody.appendChild(row);
+        });
+      }
+      
+      // Función para actualizar estadísticas
+      function actualizarEstadisticas(registros) {
+        if (!Array.isArray(registros) || registros.length === 0) return;
+        
+        // Total de registros
+        totalCount.textContent = registros.length;
+        
+        // Ordenar por hora para encontrar primera y última
+        const registrosOrdenados = [...registros].sort((a, b) => 
+          new Date(`2000-01-01T${a.hora}`) - new Date(`2000-01-01T${b.hora}`)
+        );
+        
+        // Primera hora
+        const primeraHoraRaw = registrosOrdenados[0].hora;
+        primeraHora.textContent = new Date(`2000-01-01T${primeraHoraRaw}`).toLocaleTimeString('es-ES', {
+          hour: '2-digit',
+          minute: '2-digit'
+        });
+        
+        // Última hora
+        const ultimaHoraRaw = registrosOrdenados[registrosOrdenados.length - 1].hora;
+        ultimaHora.textContent = new Date(`2000-01-01T${ultimaHoraRaw}`).toLocaleTimeString('es-ES', {
+          hour: '2-digit',
+          minute: '2-digit'
+        });
+      }
+      
+      // Funciones auxiliares
+      function showLoading(isLoading) {
+        if (isLoading) {
+          loadingContainer.classList.remove('hidden');
+        } else {
+          loadingContainer.classList.add('hidden');
+        }
+      }
+      
+      function showError(message) {
+        errorContainer.textContent = message;
+        errorContainer.classList.remove('hidden');
+      }
+      
+      function hideError() {
+        errorContainer.classList.add('hidden');
+        errorContainer.textContent = '';
+      }
+      
+      // Evento para el botón de actualizar
+      refreshButton.addEventListener('click', cargarAsistencias);
+      
+      // Cargar asistencias al inicio
+      document.addEventListener('DOMContentLoaded', cargarAsistencias);
+      
+      // Actualizar automáticamente cada 30 segundos
+      setInterval(cargarAsistencias, 30000);
+    </script>
+  </body>
+</html>

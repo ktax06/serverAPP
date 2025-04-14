@@ -1,0 +1,260 @@
+---
+import "../styles/global.css";
+---
+
+<html>
+  <head>
+    <title>Registro Asistencia Taller</title>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  </head>
+  <body class="bg-gray-100 min-h-screen">
+    <div class="container mx-auto py-8 px-4">
+      <h1 class="text-2xl font-bold text-center mb-8 text-blue-700">Registro Automático de Asistencia</h1>
+      
+      <div class="max-w-md mx-auto bg-white rounded-lg shadow-md overflow-hidden">
+        <div class="p-4 bg-blue-50 border-b border-blue-100">
+          <h2 class="text-lg font-semibold text-blue-800">Estado del Registro</h2>
+        </div>
+        
+        <div class="p-6">
+          <div class="mb-6">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-gray-600 font-medium">UID de Tarjeta:</span>
+              <span id="status-indicator" class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                Esperando lectura
+              </span>
+            </div>
+            <div id="uid-display" class="p-3 bg-gray-50 border border-gray-200 rounded-md font-mono text-sm text-gray-700">
+              Esperando UID...
+            </div>
+          </div>
+          
+          <div id="user-info" class="mb-6 hidden">
+            <div class="bg-gray-50 p-4 rounded-md border border-gray-200">
+              <div class="mb-2">
+                <span class="text-gray-600 font-medium">ID:</span>
+                <span id="user-id" class="ml-2 font-mono">-</span>
+              </div>
+              <div>
+                <span class="text-gray-600 font-medium">Nombre:</span>
+                <span id="user-name" class="ml-2">-</span>
+              </div>
+            </div>
+          </div>
+          
+          <div id="message-container" class="mt-4 p-3 rounded-md hidden">
+            <!-- Los mensajes de estado se mostrarán aquí -->
+          </div>
+        </div>
+      </div>
+      
+      <div class="mt-8 text-center">
+        <a href="/taller-visualizacion" class="inline-block bg-blue-500 hover:bg-blue-600 text-white py-2 px-6 rounded-md transition-colors">
+          Ver Lista de Asistencia
+        </a>
+        <a href="/" class="inline-block bg-green-500 hover:bg-green-600 text-white py-2 px-6 rounded-md transition-colors ml-4">
+          Ir al Home
+        </a>
+      </div>
+    </div>
+    
+    <script>
+      // Elementos del DOM
+      const uidDisplay = document.getElementById('uid-display');
+      const statusIndicator = document.getElementById('status-indicator');
+      const userInfo = document.getElementById('user-info');
+      const userId = document.getElementById('user-id');
+      const userName = document.getElementById('user-name');
+      const messageContainer = document.getElementById('message-container');
+      
+      // Variables de control
+      let lastProcessedUid = '';
+      let processingUid = false;
+      
+      // Conexión WebSocket
+      let socket;
+      
+      // Función para mostrar mensajes
+      function showMessage(message, type = 'info') {
+        messageContainer.innerHTML = message;
+        messageContainer.classList.remove('hidden', 'bg-green-50', 'text-green-700', 'bg-red-50', 'text-red-700', 'bg-blue-50', 'text-blue-700');
+        
+        switch (type) {
+          case 'success':
+            messageContainer.classList.add('bg-green-50', 'text-green-700');
+            break;
+          case 'error':
+            messageContainer.classList.add('bg-red-50', 'text-red-700');
+            break;
+          default:
+            messageContainer.classList.add('bg-blue-50', 'text-blue-700');
+        }
+        
+        messageContainer.classList.remove('hidden');
+        
+        // Auto-ocultar el mensaje después de 5 segundos si es éxito
+        if (type === 'success') {
+          setTimeout(() => {
+            messageContainer.classList.add('hidden');
+          }, 5000);
+        }
+      }
+      
+      // Actualizar el estado del indicador
+      function updateStatus(status) {
+        statusIndicator.textContent = status;
+        statusIndicator.className = 'inline-flex items-center px-3 py-1 rounded-full text-xs font-medium';
+        
+        switch (status) {
+          case 'Procesando':
+            statusIndicator.classList.add('bg-blue-100', 'text-blue-800');
+            break;
+          case 'Registrado':
+            statusIndicator.classList.add('bg-green-100', 'text-green-800');
+            break;
+          case 'Error':
+            statusIndicator.classList.add('bg-red-100', 'text-red-800');
+            break;
+          default:
+            statusIndicator.classList.add('bg-yellow-100', 'text-yellow-800');
+        }
+      }
+      
+      // Función para buscar usuario por UUID
+      async function buscarUsuarioPorUuid(uuid) {
+        try {
+          const response = await fetch(`/api/usuarios/buscar/${uuid}`);
+          
+          if (!response.ok) {
+            if (response.status === 404) {
+              throw new Error('Usuario no encontrado. Por favor registre primero esta tarjeta.');
+            }
+            throw new Error(`Error HTTP: ${response.status}`);
+          }
+          
+          const data = await response.json();
+          return data.usuario;
+        } catch (error) {
+          console.error('Error al buscar usuario:', error);
+          throw error;
+        }
+      }
+      
+      // Función para registrar asistencia
+      async function registrarAsistencia(usuario_id) {
+        try {
+          const response = await fetch('/api/taller', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ usuario_id }),
+          });
+          
+          if (!response.ok) {
+            throw new Error(`Error HTTP: ${response.status}`);
+          }
+          
+          const data = await response.json();
+          return data;
+        } catch (error) {
+          console.error('Error al registrar asistencia:', error);
+          throw error;
+        }
+      }
+      
+      // Función para procesar un UID recibido
+      async function procesarUid(uid) {
+        // Si ya estamos procesando o es el mismo UID, ignoramos
+        if (processingUid || uid === lastProcessedUid || uid === 'Esperando UID...') {
+          return;
+        }
+        
+        processingUid = true;
+        updateStatus('Procesando');
+        
+        try {
+          // Buscar el usuario por UUID
+          const usuario = await buscarUsuarioPorUuid(uid);
+          
+          // Mostrar información del usuario
+          userId.textContent = usuario.id;
+          userName.textContent = usuario.nombre;
+          userInfo.classList.remove('hidden');
+          
+          // Registrar asistencia
+          const resultado = await registrarAsistencia(usuario.id);
+          
+          // Actualizar último UID procesado para evitar duplicados
+          lastProcessedUid = uid;
+          
+          // Mostrar mensaje de éxito
+          updateStatus('Registrado');
+          showMessage(`<strong>Asistencia registrada:</strong> ${usuario.nombre} a las ${resultado.hora}`, 'success');
+          
+          // Reproducir sonido de éxito (opcional)
+          const audio = new Audio('/success.mp3');
+          audio.play().catch(e => console.warn('No se pudo reproducir audio', e));
+          
+          // Reiniciar después de 3 segundos
+          setTimeout(() => {
+            if (lastProcessedUid === uid) {
+              updateStatus('Esperando lectura');
+              uidDisplay.textContent = 'Esperando UID...';
+            }
+          }, 3000);
+          
+        } catch (error) {
+          console.error('Error en el proceso:', error);
+          updateStatus('Error');
+          showMessage(`<strong>Error:</strong> ${error.message}`, 'error');
+          
+          // Reiniciar después de 3 segundos
+          setTimeout(() => {
+            updateStatus('Esperando lectura');
+          }, 3000);
+        } finally {
+          processingUid = false;
+        }
+      }
+      
+      // Inicializar conexión WebSocket
+      window.addEventListener("DOMContentLoaded", () => {
+        // Usar protocolo seguro si la página está en HTTPS
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        socket = new WebSocket(`${protocol}//${window.location.host}/ws`);
+        
+        socket.onopen = () => {
+          console.log("✅ WebSocket conectado");
+        };
+        
+        socket.onmessage = (event) => {
+          const uid = event.data;
+          console.log("📥 UID recibido:", uid);
+          
+          // Actualizar la visualización del UID
+          uidDisplay.textContent = uid;
+          
+          // Procesar el UID
+          procesarUid(uid);
+        };
+        
+        socket.onerror = (error) => {
+          console.error("❌ Error WebSocket:", error);
+          showMessage("Error de conexión con el servidor. Por favor, recarga la página.", "error");
+        };
+        
+        socket.onclose = () => {
+          console.log("WebSocket desconectado");
+          showMessage("Conexión cerrada. Intentando reconectar...", "error");
+          
+          // Intentar reconectar después de 5 segundos
+          setTimeout(() => {
+            window.location.reload();
+          }, 5000);
+        };
+      });
+    </script>
+  </body>
+</html>

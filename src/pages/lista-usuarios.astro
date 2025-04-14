@@ -1,0 +1,149 @@
+---
+import "../styles/global.css";
+---
+
+<html>
+  <head>
+    <title>Lista de Usuarios</title>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  </head>
+  <body class="bg-gray-100 min-h-screen">
+    <div class="container mx-auto py-8 px-4">
+      <h1 class="text-2xl font-bold text-center mb-8 text-blue-700">Lista de Usuarios</h1>
+      
+      <div class="bg-white rounded-lg shadow-md overflow-hidden">
+        <div class="p-4 bg-blue-50 border-b border-blue-100 flex justify-between items-center">
+          <h2 class="text-lg font-semibold text-blue-800">Usuarios Registrados</h2>
+          <button id="refresh-btn" class="bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded-md text-sm transition-colors">
+            Actualizar
+          </button>
+        </div>
+        
+        <div class="p-4" id="loading-container">
+          <div class="flex justify-center">
+            <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-500"></div>
+          </div>
+          <p class="text-center text-gray-500 mt-2">Cargando usuarios...</p>
+        </div>
+        
+        <div id="error-container" class="hidden p-4 bg-red-50 text-red-700 text-center"></div>
+        
+        <div class="overflow-x-auto">
+          <table class="w-full" id="users-table">
+            <thead>
+              <tr class="bg-gray-50 text-gray-700 text-left">
+                <th class="py-3 px-4 font-medium">ID</th>
+                <th class="py-3 px-4 font-medium">Nombre</th>
+                <th class="py-3 px-4 font-medium">UUID (Tarjeta RFID)</th>
+              </tr>
+            </thead>
+            <tbody id="users-table-body">
+              <!-- Los datos de usuarios se cargarán aquí -->
+            </tbody>
+          </table>
+        </div>
+        
+        <div id="empty-message" class="hidden p-6 text-center text-gray-500">
+          No hay usuarios registrados.
+        </div>
+      </div>
+      
+      <div class="mt-6 text-center">
+        <a href="/crear-usuario" class="inline-block bg-green-500 hover:bg-green-600 text-white py-2 px-6 rounded-md transition-colors">
+          Crear Nuevo Usuario
+        </a>
+        <a href="/" class="inline-block bg-blue-500 hover:bg-blue-600 text-white py-2 px-6 rounded-md transition-colors ml-4">
+          Ir al Home
+        </a>
+      </div>
+    </div>
+    
+    <script>
+      // Elementos del DOM
+      const loadingContainer = document.getElementById('loading-container');
+      const errorContainer = document.getElementById('error-container');
+      const usersTableBody = document.getElementById('users-table-body');
+      const usersTable = document.getElementById('users-table');
+      const emptyMessage = document.getElementById('empty-message');
+      const refreshButton = document.getElementById('refresh-btn');
+      
+      // Función para cargar los usuarios
+      async function loadUsers() {
+        showLoading(true);
+        hideError();
+        
+        try {
+          const response = await fetch('/api/usuarios/lista');
+          
+          if (!response.ok) {
+            throw new Error(`Error HTTP: ${response.status}`);
+          }
+          
+          const data = await response.json();
+          displayUsers(data.usuarios);
+          console.log('Usuarios cargados:', data.usuarios);
+        } catch (error) {
+          console.error('Error al cargar usuarios:', error);
+          showError(`Error al cargar la lista de usuarios: ${error.message}`);
+        } finally {
+          showLoading(false);
+        }
+      }
+      
+      // Función para mostrar los usuarios en la tabla
+      function displayUsers(users) {
+        if (!Array.isArray(users) || users.length === 0) {
+          usersTable.classList.add('hidden');
+          emptyMessage.classList.remove('hidden');
+          return;
+        }
+        
+        usersTable.classList.remove('hidden');
+        emptyMessage.classList.add('hidden');
+        
+        // Limpiar la tabla
+        usersTableBody.innerHTML = '';
+        
+        // Agregar cada usuario a la tabla
+        users.forEach(user => {
+          const row = document.createElement('tr');
+          row.className = 'border-t border-gray-100 hover:bg-gray-50';
+          
+          row.innerHTML = `
+            <td class="py-3 px-4">${user.id}</td>
+            <td class="py-3 px-4">${user.nombre}</td>
+            <td class="py-3 px-4 font-mono text-sm">${user.uuid || 'No asignado'}</td>
+          `;
+          
+          usersTableBody.appendChild(row);
+        });
+      }
+      
+      // Funciones auxiliares
+      function showLoading(isLoading) {
+        if (isLoading) {
+          loadingContainer.classList.remove('hidden');
+        } else {
+          loadingContainer.classList.add('hidden');
+        }
+      }
+      
+      function showError(message) {
+        errorContainer.textContent = message;
+        errorContainer.classList.remove('hidden');
+      }
+      
+      function hideError() {
+        errorContainer.classList.add('hidden');
+        errorContainer.textContent = '';
+      }
+      
+      // Evento para el botón de actualizar
+      refreshButton.addEventListener('click', loadUsers);
+      
+      // Cargar usuarios al inicio
+      document.addEventListener('DOMContentLoaded', loadUsers);
+    </script>
+  </body>
+</html>
