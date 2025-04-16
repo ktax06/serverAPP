@@ -7,7 +7,6 @@ import "../styles/global.css";
 <div id="grafico-container" class="p-6 bg-white border border-gray-200 rounded-2xl shadow-lg max-w-3xl mx-auto mt-8" style="max-height: 600px;">
   <h2 class="text-2xl font-semibold text-gray-800 mb-6 text-center">📊 Datos de los últimos 10 días</h2>
 
-  <!-- Cargando -->
   <div id="loading" class="flex flex-col items-center justify-center py-8 text-blue-500 animate-pulse">
     <svg class="w-10 h-10 mb-2 animate-spin" fill="none" viewBox="0 0 24 24" stroke="currentColor">
       <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -16,13 +15,10 @@ import "../styles/global.css";
     <span class="text-lg font-medium">Cargando datos...</span>
   </div>
 
-  <!-- Error -->
   <div id="error-message" class="hidden text-red-600 bg-red-100 border border-red-300 rounded-md px-4 py-3 text-center mb-4"></div>
 
-  <!-- Gráfico -->
   <canvas id="grafico" class="hidden w-full h-72 max-w-full"></canvas>
 
-  <!-- Botón recargar -->
   <div class="mt-6 text-center">
     <button id="reload-button" class="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg shadow hover:bg-blue-700 transition">
       🔄 Recargar datos
@@ -31,8 +27,14 @@ import "../styles/global.css";
 </div>
 
 <script>
+  // Importa la librería Chart.js para la creación de gráficos
   import Chart from 'chart.js/auto';
 
+  /**
+   * Formatea una cadena de fecha en formato YYYY-MM-DD a un formato legible para el usuario (DD/MM/YYYY).
+   * @param {string} fechaStr - La cadena de fecha en formato YYYY-MM-DD.
+   * @returns {string} - La fecha formateada en formato DD/MM/YYYY.
+   */
   function formatearFecha(fechaStr) {
     const fecha = new Date(fechaStr);
     return fecha.toLocaleDateString('es-ES', {
@@ -42,97 +44,122 @@ import "../styles/global.css";
     });
   }
 
+  /**
+   * Realiza una petición asíncrona al servidor para obtener los datos de los últimos 10 días.
+   * Muestra un indicador de carga mientras se obtienen los datos y maneja posibles errores.
+   * Si los datos se obtienen correctamente, llama a la función para crear el gráfico.
+   */
   async function obtenerDatos() {
     try {
+      // Obtiene referencias a los elementos del DOM para la carga, error y el canvas del gráfico.
       const loadingElement = document.getElementById('loading');
       const errorElement = document.getElementById('error-message');
       const canvasElement = document.getElementById('grafico');
 
+      // Muestra el indicador de carga y oculta el mensaje de error y el gráfico.
       loadingElement.classList.remove('hidden');
       errorElement.classList.add('hidden');
       canvasElement.classList.add('hidden');
 
+      // Realiza la petición GET a la API para obtener los datos de los últimos 10 días.
       const response = await fetch('/api/taller/ultimos-10-dias');
 
+      // Si la respuesta del servidor no es exitosa, lanza un error.
       if (!response.ok) {
         throw new Error('Error al obtener los datos del servidor');
       }
 
+      // Parsea la respuesta del servidor como JSON.
       const data = await response.json();
 
+      // Verifica si la estructura de los datos recibidos es la esperada.
       if (!data.datos || !Array.isArray(data.datos)) {
         throw new Error('Formato de datos incorrecto');
       }
 
+      // Oculta el indicador de carga y muestra el canvas del gráfico.
       loadingElement.classList.add('hidden');
       canvasElement.classList.remove('hidden');
 
+      // Llama a la función para crear el gráfico con los datos obtenidos.
       crearGrafico(data.datos);
     } catch (error) {
+      // Captura cualquier error ocurrido durante la petición o el procesamiento de los datos.
       console.error('Error:', error);
+      // Oculta el indicador de carga.
       document.getElementById('loading').classList.add('hidden');
+      // Muestra el mensaje de error en la interfaz de usuario.
       const errorElement = document.getElementById('error-message');
       errorElement.textContent = error.message || 'Error al cargar los datos';
       errorElement.classList.remove('hidden');
     }
   }
 
+  /**
+   * Crea un gráfico de líneas utilizando Chart.js para visualizar la cantidad de registros por fecha.
+   * @param {Array<Object>} datos - Un array de objetos donde cada objeto tiene las propiedades 'fecha' y 'cantidad'.
+   */
   function crearGrafico(datos) {
+    // Ordena los datos por fecha para asegurar que el gráfico se muestre cronológicamente.
     const datosOrdenados = [...datos].sort((a, b) => new Date(a.fecha) - new Date(b.fecha));
+    // Extrae las fechas formateadas del array de datos ordenados.
     const fechas = datosOrdenados.map(item => formatearFecha(item.fecha));
+    // Extrae las cantidades del array de datos ordenados.
     const cantidades = datosOrdenados.map(item => item.cantidad);
 
+    // Obtiene el contexto 2D del elemento canvas donde se dibujará el gráfico.
     const ctx = document.getElementById('grafico').getContext('2d');
 
+    // Destruye la instancia del gráfico existente si hay una, para evitar conflictos al recargar los datos.
     if (window.graficoInstancia) {
         window.graficoInstancia.destroy();
     }
 
-    // Calcular el máximo de los datos con un margen del 20%
+    // Calcula el valor máximo de los datos y añade un margen del 20% para el eje Y.
     const maxDataValue = Math.max(...cantidades);
     const suggestedMax = maxDataValue === 0 ? 10 : Math.ceil(maxDataValue * 1.2);
 
+    // Crea una nueva instancia del gráfico de líneas con los datos y opciones configuradas.
     window.graficoInstancia = new Chart(ctx, {
         type: 'line',
         data: {
-            labels: fechas,
+            labels: fechas, // Etiquetas del eje X (fechas).
             datasets: [{
-                label: 'Cantidad de registros',
-                data: cantidades,
-                borderColor: '#3b82f6',
-                backgroundColor: 'rgba(59, 130, 246, 0.2)',
-                tension: 0.3,
-                fill: true,
-                pointBackgroundColor: '#2563eb',
-                pointRadius: 5,
-                pointHoverRadius: 7
+                label: 'Cantidad de registros', // Etiqueta del conjunto de datos.
+                data: cantidades, // Datos del eje Y (cantidades).
+                borderColor: '#3b82f6', // Color de la línea.
+                backgroundColor: 'rgba(59, 130, 246, 0.2)', // Color de fondo bajo la línea.
+                tension: 0.3, // Suavidad de la curva de la línea.
+                fill: true, // Rellena el área bajo la línea.
+                pointBackgroundColor: '#2563eb', // Color de los puntos.
+                pointRadius: 5, // Radio de los puntos.
+                pointHoverRadius: 7 // Radio de los puntos al pasar el ratón.
             }]
         },
         options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            aspectRatio: 2,
+            responsive: true, // Hace que el gráfico sea responsive.
+            maintainAspectRatio: false, // Permite ajustar la altura del gráfico.
+            aspectRatio: 2, // Relación de aspecto inicial del gráfico.
             scales: {
                 y: {
-                    beginAtZero: true,
+                    beginAtZero: true, // El eje Y comienza en 0.
                     ticks: {
-                        precision: 0,
-                        // Establecer un step size adecuado
-                        stepSize: maxDataValue < 10 ? 1 : Math.ceil(maxDataValue / 10)
+                        precision: 0, // No muestra decimales en las etiquetas del eje Y.
+                        stepSize: maxDataValue < 10 ? 1 : Math.ceil(maxDataValue / 10) // Define un tamaño de paso adecuado para las etiquetas del eje Y.
                     },
-                    suggestedMin: 0,
-                    suggestedMax: suggestedMax
+                    suggestedMin: 0, // Valor mínimo sugerido para el eje Y.
+                    suggestedMax: suggestedMax // Valor máximo sugerido para el eje Y.
                 }
             },
             plugins: {
                 legend: {
-                    display: true,
-                    position: 'top'
+                    display: true, // Muestra la leyenda del gráfico.
+                    position: 'top' // Posición de la leyenda.
                 },
                 tooltip: {
                     callbacks: {
-                        title: (items) => `Fecha: ${items[0].label}`,
-                        label: (item) => `Registros: ${item.raw}`
+                        title: (items) => `Fecha: ${items[0].label}`, // Formato del título del tooltip.
+                        label: (item) => `Registros: ${item.raw}` // Formato de la etiqueta del tooltip.
                     }
                 }
             }
@@ -140,11 +167,15 @@ import "../styles/global.css";
     });
 }
 
+  // Evento que se ejecuta cuando el contenido HTML del DOM ha sido completamente cargado y parseado.
   document.addEventListener('DOMContentLoaded', () => {
+    // Llama a la función para obtener y mostrar los datos del gráfico al cargar la página.
     obtenerDatos();
   });
 
+  // Obtiene la referencia al botón de recarga y agrega un listener para el evento 'click'.
   document.getElementById('reload-button')?.addEventListener('click', () => {
+    // Llama a la función para obtener y actualizar los datos del gráfico al hacer clic en el botón de recarga.
     obtenerDatos();
   });
 </script>

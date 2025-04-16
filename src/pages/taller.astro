@@ -11,12 +11,12 @@ import "../styles/global.css";
   <body class="bg-gray-100 min-h-screen">
     <div class="container mx-auto py-8 px-4">
       <h1 class="text-2xl font-bold text-center mb-8 text-blue-700">Registro Automático de Asistencia</h1>
-      
+
       <div class="max-w-md mx-auto bg-white rounded-lg shadow-md overflow-hidden">
         <div class="p-4 bg-blue-50 border-b border-blue-100">
           <h2 class="text-lg font-semibold text-blue-800">Estado del Registro</h2>
         </div>
-        
+
         <div class="p-6">
           <div class="mb-6">
             <div class="flex items-center justify-between mb-2">
@@ -29,7 +29,7 @@ import "../styles/global.css";
               Esperando UID...
             </div>
           </div>
-          
+
           <div id="user-info" class="mb-6 hidden">
             <div class="bg-gray-50 p-4 rounded-md border border-gray-200">
               <div class="mb-2">
@@ -42,13 +42,12 @@ import "../styles/global.css";
               </div>
             </div>
           </div>
-          
+
           <div id="message-container" class="mt-4 p-3 rounded-md hidden">
-            <!-- Los mensajes de estado se mostrarán aquí -->
-          </div>
+            </div>
         </div>
       </div>
-      
+
       <div class="mt-8 text-center">
         <a href="/taller-visualizacion" class="inline-block bg-blue-500 hover:bg-blue-600 text-white py-2 px-6 rounded-md transition-colors">
           Ver Lista de Asistencia
@@ -58,28 +57,29 @@ import "../styles/global.css";
         </a>
       </div>
     </div>
-    
+
     <script>
-      // Elementos del DOM
-      const uidDisplay = document.getElementById('uid-display');
-      const statusIndicator = document.getElementById('status-indicator');
-      const userInfo = document.getElementById('user-info');
-      const userId = document.getElementById('user-id');
-      const userName = document.getElementById('user-name');
-      const messageContainer = document.getElementById('message-container');
-      
-      // Variables de control
-      let lastProcessedUid = '';
-      let processingUid = false;
-      
-      // Conexión WebSocket
-      let socket;
-      
-      // Función para mostrar mensajes
+      // **Elementos del DOM (Document Object Model)**
+      const uidDisplay = document.getElementById('uid-display');     // Elemento para mostrar el UID de la tarjeta leída.
+      const statusIndicator = document.getElementById('status-indicator'); // Elemento para indicar el estado del registro (Esperando, Procesando, Registrado, Error).
+      const userInfo = document.getElementById('user-info');         // Contenedor para mostrar la información del usuario encontrado.
+      const userId = document.getElementById('user-id');             // Elemento para mostrar el ID del usuario.
+      const userName = document.getElementById('user-name');           // Elemento para mostrar el nombre del usuario.
+      const messageContainer = document.getElementById('message-container'); // Contenedor para mostrar mensajes de estado o errores al usuario.
+
+      // **Variables de control**
+      let lastProcessedUid = ''; // Almacena el último UID procesado para evitar registros duplicados inmediatos.
+      let processingUid = false; // Bandera para indicar si actualmente se está procesando un UID.
+
+      // **Conexión WebSocket**
+      let socket; // Variable para almacenar la instancia de la conexión WebSocket.
+
+      // **Función para mostrar mensajes al usuario.**
       function showMessage(message, type = 'info') {
-        messageContainer.innerHTML = message;
-        messageContainer.classList.remove('hidden', 'bg-green-50', 'text-green-700', 'bg-red-50', 'text-red-700', 'bg-blue-50', 'text-blue-700');
-        
+        messageContainer.innerHTML = message; // Establece el contenido del contenedor de mensajes.
+        messageContainer.classList.remove('hidden', 'bg-green-50', 'text-green-700', 'bg-red-50', 'text-red-700', 'bg-blue-50', 'text-blue-700'); // Oculta y remueve clases de color previas.
+
+        // Aplica clases de color según el tipo de mensaje.
         switch (type) {
           case 'success':
             messageContainer.classList.add('bg-green-50', 'text-green-700');
@@ -90,22 +90,23 @@ import "../styles/global.css";
           default:
             messageContainer.classList.add('bg-blue-50', 'text-blue-700');
         }
-        
-        messageContainer.classList.remove('hidden');
-        
-        // Auto-ocultar el mensaje después de 5 segundos si es éxito
+
+        messageContainer.classList.remove('hidden'); // Muestra el contenedor de mensajes.
+
+        // Auto-oculta el mensaje después de 5 segundos si es de éxito.
         if (type === 'success') {
           setTimeout(() => {
             messageContainer.classList.add('hidden');
           }, 5000);
         }
       }
-      
-      // Actualizar el estado del indicador
+
+      // **Función para actualizar visualmente el estado del indicador.**
       function updateStatus(status) {
-        statusIndicator.textContent = status;
-        statusIndicator.className = 'inline-flex items-center px-3 py-1 rounded-full text-xs font-medium';
-        
+        statusIndicator.textContent = status; // Actualiza el texto del indicador de estado.
+        statusIndicator.className = 'inline-flex items-center px-3 py-1 rounded-full text-xs font-medium'; // Reinicia las clases del indicador.
+
+        // Aplica clases de color según el estado.
         switch (status) {
           case 'Procesando':
             statusIndicator.classList.add('bg-blue-100', 'text-blue-800');
@@ -120,136 +121,151 @@ import "../styles/global.css";
             statusIndicator.classList.add('bg-yellow-100', 'text-yellow-800');
         }
       }
-      
-      // Función para buscar usuario por UUID
+
+      // **Función asíncrona para buscar un usuario por su UUID (identificador único de la tarjeta RFID).**
       async function buscarUsuarioPorUuid(uuid) {
         try {
+          // Realiza una petición GET a la API para buscar un usuario por su UUID.
           const response = await fetch(`/api/usuarios/buscar/${uuid}`);
-          
+
+          // Si la respuesta no es exitosa.
           if (!response.ok) {
             if (response.status === 404) {
               throw new Error('Usuario no encontrado. Por favor registre primero esta tarjeta.');
             }
             throw new Error(`Error HTTP: ${response.status}`);
           }
-          
+
+          // Si la respuesta es exitosa, parsea el JSON.
           const data = await response.json();
-          return data.usuario;
+          return data.usuario; // Devuelve la información del usuario.
         } catch (error) {
           console.error('Error al buscar usuario:', error);
-          throw error;
+          throw error; // Re-lanza el error para que sea manejado por la función que llamó a esta.
         }
       }
-      
-      // Función para registrar asistencia
+
+      // **Función asíncrona para registrar la asistencia de un usuario.**
       async function registrarAsistencia(usuario_id) {
         try {
+          // Realiza una petición POST a la API para registrar la asistencia del usuario.
           const response = await fetch('/api/taller', {
             method: 'POST',
             headers: {
-              'Content-Type': 'application/json',
+              'Content-Type': 'application/json', // Indica que se envía datos en formato JSON.
             },
-            body: JSON.stringify({ usuario_id }),
+            body: JSON.stringify({ usuario_id }), // Envía el ID del usuario en el cuerpo de la petición.
           });
-          
+
+          // Si la respuesta no es exitosa.
           if (!response.ok) {
             throw new Error(`Error HTTP: ${response.status}`);
           }
-          
+
+          // Si la respuesta es exitosa, parsea el JSON.
           const data = await response.json();
-          return data;
+          return data; // Devuelve los datos de la asistencia registrada.
         } catch (error) {
           console.error('Error al registrar asistencia:', error);
-          throw error;
+          throw error; // Re-lanza el error.
         }
       }
-      
-      // Función para procesar un UID recibido
+
+      // **Función asíncrona para procesar un UID recibido a través del WebSocket.**
       async function procesarUid(uid) {
-        // Si ya estamos procesando o es el mismo UID, ignoramos
+        // Si ya se está procesando un UID o el UID es el mismo que el último procesado o es el mensaje de espera inicial, se ignora.
         if (processingUid || uid === lastProcessedUid || uid === 'Esperando UID...') {
           return;
         }
-        
-        processingUid = true;
-        updateStatus('Procesando');
-        
+
+        processingUid = true; // Marca que se está procesando un UID.
+        updateStatus('Procesando'); // Actualiza el indicador de estado a "Procesando".
+
         try {
-          // Buscar el usuario por UUID
+          // Busca al usuario en la base de datos utilizando el UID de la tarjeta.
           const usuario = await buscarUsuarioPorUuid(uid);
-          
-          // Mostrar información del usuario
+
+          // Si se encuentra el usuario, muestra su información.
           userId.textContent = usuario.id;
           userName.textContent = usuario.nombre;
           userInfo.classList.remove('hidden');
-          
-          // Registrar asistencia
+
+          // Registra la asistencia del usuario.
           const resultado = await registrarAsistencia(usuario.id);
-          
-          // Actualizar último UID procesado para evitar duplicados
+
+          // Actualiza el último UID procesado para evitar registros duplicados.
           lastProcessedUid = uid;
-          
-          // Mostrar mensaje de éxito
+
+          // Muestra un mensaje de éxito al usuario.
           updateStatus('Registrado');
           showMessage(`<strong>Asistencia registrada:</strong> ${usuario.nombre} a las ${resultado.hora}`, 'success');
-          
-          // Reproducir sonido de éxito (opcional)
+
+          // Reproduce un sonido de éxito (opcional).
           const audio = new Audio('/success.mp3');
           audio.play().catch(e => console.warn('No se pudo reproducir audio', e));
-          
-          // Reiniciar después de 3 segundos
+
+          // Reinicia la interfaz después de 3 segundos para esperar la siguiente lectura.
           setTimeout(() => {
             if (lastProcessedUid === uid) {
               updateStatus('Esperando lectura');
               uidDisplay.textContent = 'Esperando UID...';
+              userInfo.classList.add('hidden'); // Oculta la información del usuario.
             }
           }, 3000);
-          
+
         } catch (error) {
+          // Si ocurre un error durante la búsqueda o el registro.
           console.error('Error en el proceso:', error);
-          updateStatus('Error');
-          showMessage(`<strong>Error:</strong> ${error.message}`, 'error');
-          
-          // Reiniciar después de 3 segundos
+          updateStatus('Error'); // Actualiza el indicador de estado a "Error".
+          showMessage(`<strong>Error:</strong> ${error.message}`, 'error'); // Muestra el mensaje de error.
+
+          // Reinicia el estado después de 3 segundos para permitir nuevas lecturas.
           setTimeout(() => {
             updateStatus('Esperando lectura');
+            uidDisplay.textContent = 'Esperando UID...';
+            userInfo.classList.add('hidden'); // Oculta la información del usuario.
           }, 3000);
         } finally {
-          processingUid = false;
+          processingUid = false; // Marca que el procesamiento del UID ha terminado.
         }
       }
-      
-      // Inicializar conexión WebSocket
+
+      // **Inicializa la conexión WebSocket cuando el contenido de la página se ha cargado.**
       window.addEventListener("DOMContentLoaded", () => {
-        // Usar protocolo seguro si la página está en HTTPS
+        // Determina el protocolo a usar (wss si la página es HTTPS, ws si no).
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        // Crea una nueva conexión WebSocket al servidor.
         socket = new WebSocket(`${protocol}//${window.location.host}/ws`);
-        
+
+        // Evento que se ejecuta cuando la conexión WebSocket se abre.
         socket.onopen = () => {
           console.log("✅ WebSocket conectado");
         };
-        
+
+        // Evento que se ejecuta cuando el servidor WebSocket envía un mensaje.
         socket.onmessage = (event) => {
-          const uid = event.data;
+          const uid = event.data; // Obtiene el UID de los datos del evento.
           console.log("📥 UID recibido:", uid);
-          
-          // Actualizar la visualización del UID
+
+          // Actualiza la visualización del UID en la página.
           uidDisplay.textContent = uid;
-          
-          // Procesar el UID
+
+          // Procesa el UID recibido.
           procesarUid(uid);
         };
-        
+
+        // Evento que se ejecuta cuando ocurre un error en la conexión WebSocket.
         socket.onerror = (error) => {
           console.error("❌ Error WebSocket:", error);
           showMessage("Error de conexión con el servidor. Por favor, recarga la página.", "error");
         };
-        
+
+        // Evento que se ejecuta cuando la conexión WebSocket se cierra.
         socket.onclose = () => {
           console.log("WebSocket desconectado");
           showMessage("Conexión cerrada. Intentando reconectar...", "error");
-          
-          // Intentar reconectar después de 5 segundos
+
+          // Intenta recargar la página después de 5 segundos para intentar reconectar.
           setTimeout(() => {
             window.location.reload();
           }, 5000);

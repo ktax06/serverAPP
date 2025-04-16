@@ -11,7 +11,7 @@ import "../styles/global.css";
   <body class="bg-gray-100 min-h-screen">
     <div class="container mx-auto py-8 px-4">
       <h1 class="text-2xl font-bold text-center mb-8 text-blue-700">Registro de Asistencia del Día</h1>
-      
+
       <div class="bg-white rounded-lg shadow-md overflow-hidden max-w-4xl mx-auto">
         <div class="p-4 bg-blue-50 border-b border-blue-100 flex justify-between items-center">
           <div>
@@ -22,33 +22,33 @@ import "../styles/global.css";
             Actualizar
           </button>
         </div>
-        
+
         <div class="p-4" id="loading-container">
           <div class="flex justify-center">
             <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-500"></div>
           </div>
           <p class="text-center text-gray-500 mt-2">Cargando datos de asistencia...</p>
         </div>
-        
+
         <div id="stats-container" class="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 hidden">
           <div class="bg-blue-50 p-3 rounded-lg text-center">
             <p class="text-blue-800 text-sm font-medium">Total Asistencias</p>
             <p id="total-count" class="text-2xl font-bold text-blue-900">0</p>
           </div>
-          
+
           <div class="bg-green-50 p-3 rounded-lg text-center">
             <p class="text-green-800 text-sm font-medium">Primera Entrada</p>
             <p id="primera-hora" class="text-lg font-bold text-green-900">--:--</p>
           </div>
-          
+
           <div class="bg-purple-50 p-3 rounded-lg text-center">
             <p class="text-purple-800 text-sm font-medium">Última Entrada</p>
             <p id="ultima-hora" class="text-lg font-bold text-purple-900">--:--</p>
           </div>
         </div>
-        
+
         <div id="error-container" class="hidden p-4 bg-red-50 text-red-700 text-center"></div>
-        
+
         <div class="overflow-x-auto">
           <table class="w-full" id="asistencia-table">
             <thead>
@@ -60,21 +60,20 @@ import "../styles/global.css";
               </tr>
             </thead>
             <tbody id="asistencia-table-body">
-              <!-- Los datos de asistencia se cargarán aquí -->
-            </tbody>
+              </tbody>
           </table>
         </div>
-        
+
         <div id="empty-message" class="hidden p-6 text-center text-gray-500">
           No hay registros de asistencia para el día de hoy.
         </div>
       </div>
-      
+
       <div class="mt-6 text-center">
         <a href="/" class="inline-block bg-gray-500 hover:bg-gray-600 text-white py-2 px-6 rounded-md transition-colors mr-4">
           Volver al Inicio
         </a>
-        <a href="/registro-asistencia" class="inline-block bg-green-500 hover:bg-green-600 text-white py-2 px-6 rounded-md transition-colors mr-4">
+        <a href="/taller" class="inline-block bg-green-500 hover:bg-green-600 text-white py-2 px-6 rounded-md transition-colors mr-4">
           Registrar Nueva Asistencia
         </a>
         <a href="/grafico" class="inline-block bg-blue-500 hover:bg-blue-600 text-white py-2 px-6 rounded-md transition-colors">
@@ -82,70 +81,81 @@ import "../styles/global.css";
         </a>
       </div>
     </div>
-    
+
     <script>
-      // Elementos del DOM
-      const loadingContainer = document.getElementById('loading-container');
-      const errorContainer = document.getElementById('error-container');
-      const asistenciaTableBody = document.getElementById('asistencia-table-body');
-      const asistenciaTable = document.getElementById('asistencia-table');
-      const emptyMessage = document.getElementById('empty-message');
-      const refreshButton = document.getElementById('refresh-btn');
-      const fechaActual = document.getElementById('fecha-actual');
-      const totalCount = document.getElementById('total-count');
-      const primeraHora = document.getElementById('primera-hora');
-      const ultimaHora = document.getElementById('ultima-hora');
-      const statsContainer = document.getElementById('stats-container');
-      
-      // Cache para los nombres de usuario
+      // **Elementos del DOM (Document Object Model)**
+      const loadingContainer = document.getElementById('loading-container'); // Contenedor para la animación de carga.
+      const errorContainer = document.getElementById('error-container');   // Contenedor para mostrar mensajes de error.
+      const asistenciaTableBody = document.getElementById('asistencia-table-body'); // Cuerpo de la tabla donde se insertarán los datos de asistencia.
+      const asistenciaTable = document.getElementById('asistencia-table');     // La tabla que contiene la lista de asistencias.
+      const emptyMessage = document.getElementById('empty-message');         // Mensaje que se muestra si no hay registros de asistencia.
+      const refreshButton = document.getElementById('refresh-btn');         // Botón para recargar los datos de asistencia.
+      const fechaActual = document.getElementById('fecha-actual');           // Elemento para mostrar la fecha actual.
+      const totalCount = document.getElementById('total-count');             // Elemento para mostrar el total de asistencias.
+      const primeraHora = document.getElementById('primera-hora');           // Elemento para mostrar la primera hora de entrada.
+      const ultimaHora = document.getElementById('ultima-hora');             // Elemento para mostrar la última hora de entrada.
+      const statsContainer = document.getElementById('stats-container');     // Contenedor para las estadísticas de asistencia.
+
+      // **Cache para almacenar los nombres de usuario para evitar múltiples peticiones a la API.**
       const usuariosCache = {};
-      
-      // Formatear fecha actual para mostrar
+
+      // **Formatea la fecha actual para mostrarla en el encabezado.**
       const hoy = new Date();
       const opciones = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
       fechaActual.textContent = hoy.toLocaleDateString('es-ES', opciones);
-      
-      // Función para cargar los datos de asistencia
+
+      // **Función asíncrona para cargar los datos de asistencia del día actual.**
       async function cargarAsistencias() {
-        showLoading(true);
-        hideError();
-        
+        showLoading(true); // Muestra el indicador de carga.
+        hideError();      // Oculta cualquier mensaje de error previo.
+
         try {
+          // Realiza una petición GET a la ruta '/api/taller/hoy' para obtener los registros de asistencia del día.
           const response = await fetch('/api/taller/hoy');
-          
+
+          // Si la respuesta del servidor no es exitosa (código de estado fuera del rango 200-299), lanza un error.
           if (!response.ok) {
             throw new Error(`Error HTTP: ${response.status}`);
           }
-          
+
+          // Parsea la respuesta del servidor como un objeto JSON.
           const data = await response.json();
+          // Obtiene los nombres de los usuarios asociados a los registros de asistencia.
           await obtenerNombresUsuarios(data.datos);
+          // Muestra los registros de asistencia en la tabla.
           mostrarAsistencias(data.datos);
+          // Actualiza las estadísticas de asistencia mostradas en la parte superior.
           actualizarEstadisticas(data.datos);
-          console.log('Asistencias cargadas:', data.datos);
+          console.log('Asistencias cargadas:', data.datos); // Muestra los datos de asistencia cargados en la consola.
         } catch (error) {
+          // Captura cualquier error ocurrido durante la petición o el procesamiento de los datos.
           console.error('Error al cargar asistencias:', error);
+          // Muestra un mensaje de error en la interfaz de usuario.
           showError(`Error al cargar los datos de asistencia: ${error.message}`);
         } finally {
-          showLoading(false);
+          // Se ejecuta siempre, independientemente de si la promesa se resolvió o fue rechazada.
+          showLoading(false); // Oculta el indicador de carga.
         }
       }
-      
-      // Obtener nombres de usuarios para cada registro
+
+      // **Función asíncrona para obtener los nombres de los usuarios a partir de sus IDs.**
       async function obtenerNombresUsuarios(registros) {
-        // Crear un conjunto de IDs únicos para consultar
+        // Crea un conjunto (Set) de IDs de usuario únicos para evitar consultas duplicadas.
         const usuariosIds = new Set(registros.map(registro => registro.usuario_id));
+        // Filtra los IDs que aún no están en la caché.
         const idsParaConsultar = [...usuariosIds].filter(id => !usuariosCache[id]);
-        
+
+        // Si no hay nuevos IDs para consultar, la función termina.
         if (idsParaConsultar.length === 0) return;
-        
+
         try {
-          // Obtener todos los usuarios de una vez
+          // Realiza una petición GET a la ruta '/api/usuarios/lista' para obtener la lista completa de usuarios.
           const response = await fetch('/api/usuarios/lista');
           if (!response.ok) throw new Error('Error al obtener lista de usuarios');
-          
+
           const data = await response.json();
-          
-          // Actualizar el cache con los nombres de usuarios
+
+          // Actualiza la caché con los nombres de los usuarios obtenidos.
           if (data.usuarios && Array.isArray(data.usuarios)) {
             data.usuarios.forEach(usuario => {
               usuariosCache[usuario.id] = usuario.nombre;
@@ -155,101 +165,111 @@ import "../styles/global.css";
           console.error('Error al obtener nombres de usuarios:', error);
         }
       }
-      
-      // Función para mostrar las asistencias en la tabla
+
+      // **Función para mostrar los registros de asistencia en la tabla HTML.**
       function mostrarAsistencias(registros) {
+        // Verifica si 'registros' no es un array o si está vacío.
         if (!Array.isArray(registros) || registros.length === 0) {
-          asistenciaTable.classList.add('hidden');
-          statsContainer.classList.add('hidden');
-          emptyMessage.classList.remove('hidden');
-          return;
+          asistenciaTable.classList.add('hidden');    // Oculta la tabla de asistencia.
+          statsContainer.classList.add('hidden');    // Oculta el contenedor de estadísticas.
+          emptyMessage.classList.remove('hidden'); // Muestra el mensaje de que no hay registros.
+          return; // Sale de la función.
         }
-        
-        asistenciaTable.classList.remove('hidden');
-        statsContainer.classList.remove('hidden');
-        emptyMessage.classList.add('hidden');
-        
-        // Limpiar la tabla
+
+        asistenciaTable.classList.remove('hidden');   // Muestra la tabla de asistencia si hay datos.
+        statsContainer.classList.remove('hidden');   // Muestra el contenedor de estadísticas.
+        emptyMessage.classList.add('hidden');    // Oculta el mensaje de que no hay registros.
+
+        // Limpia el contenido del cuerpo de la tabla antes de agregar nuevos datos.
         asistenciaTableBody.innerHTML = '';
-        
-        // Ordenar registros por hora (más reciente primero)
+
+        // Ordena los registros por hora de forma descendente (más reciente primero).
         registros.sort((a, b) => new Date(`2000-01-01T${b.hora}`) - new Date(`2000-01-01T${a.hora}`));
-        
-        // Agregar cada registro a la tabla
+
+        // Itera sobre cada registro de asistencia.
         registros.forEach(registro => {
+          // Crea una nueva fila (<tr>) para cada registro.
           const row = document.createElement('tr');
-          row.className = 'border-t border-gray-100 hover:bg-gray-50';
-          
-          // Formatear hora para mostrar
+          row.className = 'border-t border-gray-100 hover:bg-gray-50'; // Aplica clases CSS para estilos.
+
+          // Formatea la hora para mostrarla en un formato legible (HH:MM).
           const horaFormateada = new Date(`2000-01-01T${registro.hora}`).toLocaleTimeString('es-ES', {
             hour: '2-digit',
             minute: '2-digit'
           });
-          
+
+          // Define el contenido HTML de cada celda (<td>) de la fila con los datos del registro.
           row.innerHTML = `
             <td class="py-3 px-4">${registro.id}</td>
             <td class="py-3 px-4">${registro.usuario_id}</td>
             <td class="py-3 px-4">${usuariosCache[registro.usuario_id] || 'Usuario desconocido'}</td>
             <td class="py-3 px-4">${horaFormateada}</td>
           `;
-          
+
+          // Agrega la fila creada al cuerpo de la tabla de asistencia.
           asistenciaTableBody.appendChild(row);
         });
       }
-      
-      // Función para actualizar estadísticas
+
+      // **Función para actualizar las estadísticas de asistencia (total, primera y última hora).**
       function actualizarEstadisticas(registros) {
+        // Si no hay registros, la función termina.
         if (!Array.isArray(registros) || registros.length === 0) return;
-        
-        // Total de registros
+
+        // Total de registros de asistencia.
         totalCount.textContent = registros.length;
-        
-        // Ordenar por hora para encontrar primera y última
-        const registrosOrdenados = [...registros].sort((a, b) => 
+
+        // Crea una copia del array de registros y lo ordena por hora de forma ascendente para encontrar la primera hora.
+        const registrosOrdenadosAscendente = [...registros].sort((a, b) =>
           new Date(`2000-01-01T${a.hora}`) - new Date(`2000-01-01T${b.hora}`)
         );
-        
-        // Primera hora
-        const primeraHoraRaw = registrosOrdenados[0].hora;
+
+        // Obtiene la primera hora del primer registro ordenado.
+        const primeraHoraRaw = registrosOrdenadosAscendente[0].hora;
         primeraHora.textContent = new Date(`2000-01-01T${primeraHoraRaw}`).toLocaleTimeString('es-ES', {
           hour: '2-digit',
           minute: '2-digit'
         });
-        
-        // Última hora
-        const ultimaHoraRaw = registrosOrdenados[registrosOrdenados.length - 1].hora;
+
+        // Crea una copia del array de registros y lo ordena por hora de forma descendente para encontrar la última hora.
+        const registrosOrdenadosDescendente = [...registros].sort((a, b) =>
+          new Date(`2000-01-01T${b.hora}`) - new Date(`2000-01-01T${a.hora}`)
+        );
+
+        // Obtiene la última hora del primer registro ordenado descendentemente.
+        const ultimaHoraRaw = registrosOrdenadosDescendente[0].hora;
         ultimaHora.textContent = new Date(`2000-01-01T${ultimaHoraRaw}`).toLocaleTimeString('es-ES', {
           hour: '2-digit',
           minute: '2-digit'
         });
       }
-      
-      // Funciones auxiliares
+
+      // **Funciones auxiliares para mostrar y ocultar elementos de la interfaz de usuario.**
       function showLoading(isLoading) {
         if (isLoading) {
-          loadingContainer.classList.remove('hidden');
+          loadingContainer.classList.remove('hidden'); // Muestra el contenedor de carga.
         } else {
-          loadingContainer.classList.add('hidden');
+          loadingContainer.classList.add('hidden');    // Oculta el contenedor de carga.
         }
       }
-      
+
       function showError(message) {
-        errorContainer.textContent = message;
-        errorContainer.classList.remove('hidden');
+        errorContainer.textContent = message;       // Establece el texto del mensaje de error.
+        errorContainer.classList.remove('hidden'); // Muestra el contenedor de error.
       }
-      
+
       function hideError() {
-        errorContainer.classList.add('hidden');
-        errorContainer.textContent = '';
+        errorContainer.classList.add('hidden');    // Oculta el contenedor de error.
+        errorContainer.textContent = '';         // Limpia el texto del mensaje de error.
       }
-      
-      // Evento para el botón de actualizar
-      refreshButton.addEventListener('click', cargarAsistencias);
-      
-      // Cargar asistencias al inicio
+
+      // **Evento para el botón de actualizar.**
+      refreshButton.addEventListener('click', cargarAsistencias); // Llama a la función 'cargarAsistencias' al hacer clic.
+
+      // **Cargar los datos de asistencia al cargar la página.**
       document.addEventListener('DOMContentLoaded', cargarAsistencias);
-      
-      // Actualizar automáticamente cada 30 segundos
+
+      // **Actualizar automáticamente los datos de asistencia cada 30 segundos.**
       setInterval(cargarAsistencias, 30000);
     </script>
   </body>

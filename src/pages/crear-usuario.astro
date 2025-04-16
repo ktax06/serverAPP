@@ -16,7 +16,6 @@ import "../styles/global.css";
         readonly
         class="w-full px-3 py-2 border border-gray-300 rounded mb-4 bg-gray-100"
       />
-
       <label for="nombre" class="block text-gray-700 mb-2">Nombre:</label>
       <input
         type="text"
@@ -25,69 +24,88 @@ import "../styles/global.css";
         required
         class="w-full px-3 py-2 border border-gray-300 rounded mb-4"
       />
-
       <button
         type="submit"
         class="w-full bg-blue-500 text-white py-2 rounded hover:bg-blue-600"
       >
         Guardar
       </button>
-    </form>
+      </form>
 
     <script>
+      // Variable para almacenar la instancia del WebSocket.
       let socket;
 
+      // Evento que se ejecuta cuando el contenido HTML del DOM ha sido completamente cargado y parseado.
       window.addEventListener("DOMContentLoaded", () => {
+        // Obtiene la referencia al elemento de input con el ID 'uid'.
         const uidInput = document.getElementById("uid");
+        // Crea una nueva instancia del WebSocket, conectándose al servidor en la misma dirección y puerto
+        // donde se está sirviendo la página, en la ruta '/ws'.
         socket = new WebSocket("ws://" + window.location.host + "/ws");
 
+        // Evento que se ejecuta cuando la conexión WebSocket se establece correctamente.
         socket.onopen = () => {
           console.log("✅ WebSocket conectado");
         };
 
+        // Evento que se ejecuta cuando el servidor WebSocket envía un mensaje al cliente.
         socket.onmessage = (event) => {
           console.log("📥 UID recibido:", event.data);
+          // Asigna el dato recibido (el UID) al valor del campo de entrada 'uid'.
           uidInput.value = event.data;
         };
 
+        // Evento que se ejecuta cuando ocurre un error en la conexión WebSocket.
         socket.onerror = (error) => {
           console.error("❌ Error WebSocket:", error);
         };
       });
 
+      // Obtiene la referencia al formulario con el ID 'formularioUsuario' y agrega un listener para el evento 'submit'.
       document.getElementById("formularioUsuario").addEventListener("submit", async (event) => {
+        // Previene el comportamiento por defecto del formulario al ser enviado (recargar la página).
         event.preventDefault();
 
+        // Obtiene los valores del campo de entrada 'uid' y 'nombre'.
         const uid = document.getElementById("uid").value;
         const nombre = document.getElementById("nombre").value;
 
+        // Verifica si el UID está disponible. Si no lo está, muestra una alerta y detiene el proceso.
         if (!uid) {
           alert("⚠️ UID no disponible.");
           return;
         }
 
         try {
-          // Enviar datos al endpoint API
+          // Realiza una petición POST a la API en la ruta '/api/usuarios' para guardar el nuevo usuario.
           const response = await fetch("/api/usuarios", {
             method: "POST",
             headers: {
-              "Content-Type": "application/json",
+              "Content-Type": "application/json", // Indica que el cuerpo de la petición es JSON.
             },
-            body: JSON.stringify({ nombre, uuid: uid }),
+            body: JSON.stringify({ nombre, uuid: uid }), // Convierte el objeto con nombre y UID a una cadena JSON.
           });
 
+          // Verifica si la respuesta de la API fue exitosa (código de estado HTTP en el rango 200-299).
           if (!response.ok) {
+            // Si la respuesta no es exitosa, intenta parsear el cuerpo como JSON para obtener un mensaje de error.
             const errorData = await response.json();
+            // Lanza un nuevo error con el mensaje proporcionado por la API o un mensaje genérico.
             throw new Error(errorData.error || "Error al guardar usuario");
           }
 
+          // Si la respuesta es exitosa, parsea el cuerpo como JSON para obtener los datos del usuario guardado.
           const data = await response.json();
           console.log("✅ Usuario guardado:", data);
+          // Muestra una alerta indicando que el usuario se guardó correctamente.
           alert("✅ Usuario guardado correctamente");
-          
-          // Limpiar el formulario
+
+          // Limpia el valor del campo de entrada 'nombre' después de guardar el usuario.
           document.getElementById("nombre").value = "";
         } catch (error) {
+          // Si ocurre algún error durante la petición o el procesamiento de la respuesta,
+          // lo imprime en la consola y muestra una alerta con el mensaje de error.
           console.error("❌ Error al guardar usuario:", error);
           alert("❌ Error: " + error.message);
         }

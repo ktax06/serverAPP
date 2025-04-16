@@ -11,7 +11,7 @@ import "../styles/global.css";
   <body class="bg-gray-100 min-h-screen">
     <div class="container mx-auto py-8 px-4">
       <h1 class="text-2xl font-bold text-center mb-8 text-blue-700">Lista de Usuarios</h1>
-      
+
       <div class="bg-white rounded-lg shadow-md overflow-hidden">
         <div class="p-4 bg-blue-50 border-b border-blue-100 flex justify-between items-center">
           <h2 class="text-lg font-semibold text-blue-800">Usuarios Registrados</h2>
@@ -19,16 +19,16 @@ import "../styles/global.css";
             Actualizar
           </button>
         </div>
-        
+
         <div class="p-4" id="loading-container">
           <div class="flex justify-center">
             <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-500"></div>
           </div>
           <p class="text-center text-gray-500 mt-2">Cargando usuarios...</p>
         </div>
-        
+
         <div id="error-container" class="hidden p-4 bg-red-50 text-red-700 text-center"></div>
-        
+
         <div class="overflow-x-auto">
           <table class="w-full" id="users-table">
             <thead>
@@ -39,16 +39,15 @@ import "../styles/global.css";
               </tr>
             </thead>
             <tbody id="users-table-body">
-              <!-- Los datos de usuarios se cargarán aquí -->
-            </tbody>
+              </tbody>
           </table>
         </div>
-        
+
         <div id="empty-message" class="hidden p-6 text-center text-gray-500">
           No hay usuarios registrados.
         </div>
       </div>
-      
+
       <div class="mt-6 text-center">
         <a href="/crear-usuario" class="inline-block bg-green-500 hover:bg-green-600 text-white py-2 px-6 rounded-md transition-colors">
           Crear Nuevo Usuario
@@ -58,91 +57,102 @@ import "../styles/global.css";
         </a>
       </div>
     </div>
-    
+
     <script>
-      // Elementos del DOM
-      const loadingContainer = document.getElementById('loading-container');
-      const errorContainer = document.getElementById('error-container');
-      const usersTableBody = document.getElementById('users-table-body');
-      const usersTable = document.getElementById('users-table');
-      const emptyMessage = document.getElementById('empty-message');
-      const refreshButton = document.getElementById('refresh-btn');
-      
-      // Función para cargar los usuarios
+      // **Elementos del DOM (Document Object Model)**
+      const loadingContainer = document.getElementById('loading-container'); // Contenedor para la animación de carga.
+      const errorContainer = document.getElementById('error-container');   // Contenedor para mostrar mensajes de error.
+      const usersTableBody = document.getElementById('users-table-body'); // Cuerpo de la tabla donde se insertarán los datos de los usuarios.
+      const usersTable = document.getElementById('users-table');         // La tabla que contiene la lista de usuarios.
+      const emptyMessage = document.getElementById('empty-message');     // Mensaje que se muestra si no hay usuarios registrados.
+      const refreshButton = document.getElementById('refresh-btn');     // Botón para recargar la lista de usuarios.
+
+      // **Función asíncrona para cargar la lista de usuarios desde la API.**
       async function loadUsers() {
-        showLoading(true);
-        hideError();
-        
+        showLoading(true); // Muestra el indicador de carga.
+        hideError();      // Oculta cualquier mensaje de error previo.
+
         try {
+          // Realiza una petición GET a la ruta '/api/usuarios/lista' para obtener la lista de usuarios.
           const response = await fetch('/api/usuarios/lista');
-          
+
+          // Si la respuesta del servidor no es exitosa (código de estado fuera del rango 200-299), lanza un error.
           if (!response.ok) {
             throw new Error(`Error HTTP: ${response.status}`);
           }
-          
+
+          // Parsea la respuesta del servidor como un objeto JSON.
           const data = await response.json();
+          // Llama a la función para mostrar los usuarios en la tabla.
           displayUsers(data.usuarios);
-          console.log('Usuarios cargados:', data.usuarios);
+          console.log('Usuarios cargados:', data.usuarios); // Muestra los usuarios cargados en la consola.
         } catch (error) {
+          // Captura cualquier error ocurrido durante la petición o el procesamiento de la respuesta.
           console.error('Error al cargar usuarios:', error);
+          // Muestra un mensaje de error en la interfaz de usuario.
           showError(`Error al cargar la lista de usuarios: ${error.message}`);
         } finally {
-          showLoading(false);
+          // Se ejecuta siempre, independientemente de si la promesa se resolvió o fue rechazada.
+          showLoading(false); // Oculta el indicador de carga.
         }
       }
-      
-      // Función para mostrar los usuarios en la tabla
+
+      // **Función para mostrar la lista de usuarios en la tabla HTML.**
       function displayUsers(users) {
+        // Verifica si 'users' no es un array o si está vacío.
         if (!Array.isArray(users) || users.length === 0) {
-          usersTable.classList.add('hidden');
-          emptyMessage.classList.remove('hidden');
-          return;
+          usersTable.classList.add('hidden');    // Oculta la tabla de usuarios.
+          emptyMessage.classList.remove('hidden'); // Muestra el mensaje de que no hay usuarios.
+          return; // Sale de la función.
         }
-        
-        usersTable.classList.remove('hidden');
-        emptyMessage.classList.add('hidden');
-        
-        // Limpiar la tabla
+
+        usersTable.classList.remove('hidden');   // Muestra la tabla de usuarios si hay datos.
+        emptyMessage.classList.add('hidden');    // Oculta el mensaje de que no hay usuarios.
+
+        // Limpia el contenido del cuerpo de la tabla antes de agregar nuevos datos.
         usersTableBody.innerHTML = '';
-        
-        // Agregar cada usuario a la tabla
+
+        // Itera sobre cada usuario en el array 'users'.
         users.forEach(user => {
+          // Crea una nueva fila (<tr>) para cada usuario.
           const row = document.createElement('tr');
-          row.className = 'border-t border-gray-100 hover:bg-gray-50';
-          
+          row.className = 'border-t border-gray-100 hover:bg-gray-50'; // Aplica clases CSS para estilos.
+
+          // Define el contenido HTML de cada celda (<td>) de la fila con los datos del usuario.
           row.innerHTML = `
             <td class="py-3 px-4">${user.id}</td>
             <td class="py-3 px-4">${user.nombre}</td>
             <td class="py-3 px-4 font-mono text-sm">${user.uuid || 'No asignado'}</td>
           `;
-          
+
+          // Agrega la fila creada al cuerpo de la tabla.
           usersTableBody.appendChild(row);
         });
       }
-      
-      // Funciones auxiliares
+
+      // **Funciones auxiliares para mostrar y ocultar elementos de la interfaz de usuario.**
       function showLoading(isLoading) {
         if (isLoading) {
-          loadingContainer.classList.remove('hidden');
+          loadingContainer.classList.remove('hidden'); // Muestra el contenedor de carga.
         } else {
-          loadingContainer.classList.add('hidden');
+          loadingContainer.classList.add('hidden');    // Oculta el contenedor de carga.
         }
       }
-      
+
       function showError(message) {
-        errorContainer.textContent = message;
-        errorContainer.classList.remove('hidden');
+        errorContainer.textContent = message;       // Establece el texto del mensaje de error.
+        errorContainer.classList.remove('hidden'); // Muestra el contenedor de error.
       }
-      
+
       function hideError() {
-        errorContainer.classList.add('hidden');
-        errorContainer.textContent = '';
+        errorContainer.classList.add('hidden');    // Oculta el contenedor de error.
+        errorContainer.textContent = '';         // Limpia el texto del mensaje de error.
       }
-      
-      // Evento para el botón de actualizar
-      refreshButton.addEventListener('click', loadUsers);
-      
-      // Cargar usuarios al inicio
+
+      // **Evento para el botón de actualizar.**
+      refreshButton.addEventListener('click', loadUsers); // Llama a la función 'loadUsers' cuando se hace clic en el botón.
+
+      // **Cargar usuarios al inicio cuando el DOM esté completamente cargado.**
       document.addEventListener('DOMContentLoaded', loadUsers);
     </script>
   </body>
